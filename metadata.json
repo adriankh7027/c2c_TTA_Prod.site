@@ -1,0 +1,5 @@
+{
+  "name": "API Copy of Friend Trip Planner-Working",
+  "description": "An application for a group of friends to plan their monthly trips and automatically allocate booking responsibilities. Features separate views for users to submit their plans and an admin to manage and view allocations.",
+  "requestFramePermissions": []
+}

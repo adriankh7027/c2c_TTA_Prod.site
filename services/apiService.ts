@@ -1,7 +1,7 @@
 import { User, Plan, Allocation, SystemSettings } from '../types';
 
 // UPDATED: Set to the correct local development API URL
-const BASE_URL = 'https://localhost:7116/api';
+const BASE_URL = 'https://c2c-tta-api-h3avdjb6ceendzec.southindia-01.azurewebsites.net/api';
 
 // --- Helper for API calls ---
 async function fetchApi(endpoint: string, options: RequestInit = {}) {

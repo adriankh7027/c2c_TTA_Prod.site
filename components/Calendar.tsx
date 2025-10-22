@@ -35,7 +35,9 @@ const Calendar: React.FC<CalendarProps> = ({
       const dateString = date.toISOString().split('T')[0];
       
       const isSelected = selectedDays.includes(day);
-      const isHoliday = holidays.includes(dateString);
+      // FIX: Check if any holiday's full ISO string starts with the current day's YYYY-MM-DD string.
+      // This correctly handles timezone differences and ensures holidays are always highlighted properly.
+      const isHoliday = holidays.some(h => h.startsWith(dateString));
       const isCurrentDate = new Date(year, month, day).getTime() === today.getTime();
 
       const dayClasses = `

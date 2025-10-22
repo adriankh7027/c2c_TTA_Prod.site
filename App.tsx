@@ -7,6 +7,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import SystemAdminDashboard from './pages/SystemAdminDashboard';
 import Header from './components/Header';
 import SuccessBanner from './components/SuccessBanner';
+import AboutPage from './pages/AboutPage';
+import LoadingOverlay from './components/LoadingOverlay';
+import EditProfilePage from './pages/EditProfilePage';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -17,8 +20,9 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [updatedUsers, setUpdatedUsers] = useState<string[]>([]);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [view, setView] = useState<'login' | 'about'>('login');
+  const [loggedInView, setLoggedInView] = useState<'dashboard' | 'profile'>('dashboard');
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -68,10 +72,8 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    const storedUserStr = sessionStorage.getItem('trip_planner_currentUser');
-    if (storedUserStr) {
-        setCurrentUser(JSON.parse(storedUserStr));
-    }
+    // Per user request, refreshing the browser should always return to the main login screen.
+    // Therefore, the session is not restored from sessionStorage on initial load.
     loadInitialData();
   }, [loadInitialData]);
   
@@ -87,6 +89,7 @@ const App: React.FC = () => {
         setCurrentUser(user);
         sessionStorage.setItem('trip_planner_currentUser', JSON.stringify(user));
         showSuccess(`Welcome, ${user.name}!`);
+        setLoggedInView('dashboard');
         return user;
     } catch (error) {
         console.error('Login failed', error);
@@ -97,6 +100,8 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     sessionStorage.removeItem('trip_planner_currentUser');
+    setView('login');
+    setLoggedInView('dashboard');
   };
 
   const handleUpdateUser = async (updatedUserData: User, newPin?: string, currentPin?: string) => {
@@ -160,17 +165,28 @@ const App: React.FC = () => {
   };
 
   const handleAllocate = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !settings) {
+      alert('Cannot generate allocations. Missing required data.');
+      return;
+    }
     setIsLoading(true);
     try {
-        const newAllocations = await api.generateAllocations({ actorUserId: currentUser.id });
-        setAllocations(newAllocations);
-        setUpdatedUsers([]); // Clear updates locally for instant feedback
-        showSuccess('Allocations generated successfully!');
+      // Logic is now correctly using the backend API to generate and persist allocations.
+      const newAllocations = await api.generateAllocations({ actorUserId: currentUser.id });
+      
+      setAllocations(newAllocations);
+
+      // After generation, the list of users who updated their plan is cleared by the backend.
+      // Fetching it again confirms this and removes the warning banner.
+      const fetchedUpdatedUsers = await api.fetchUpdatedUsers();
+      setUpdatedUsers(fetchedUpdatedUsers);
+
+      showSuccess('Allocations generated successfully!');
     } catch (error) {
-        alert('Failed to generate allocations.');
+      console.error("Failed to generate allocations from API", error);
+      alert('Failed to generate allocations.');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
   
@@ -197,7 +213,17 @@ const App: React.FC = () => {
   };
 
   const renderDashboard = () => {
-    if (!currentUser || !settings) return <div className="text-center">Loading dashboard...</div>;
+    if (!currentUser || !settings) return null; // Loading is handled by the overlay
+
+    if (loggedInView === 'profile' && currentUser.role === Role.User) {
+      return (
+        <EditProfilePage
+          user={currentUser}
+          onUpdateUser={handleUpdateUser}
+          onBack={() => setLoggedInView('dashboard')}
+        />
+      );
+    }
 
     switch (currentUser.role) {
       case Role.User:
@@ -206,12 +232,9 @@ const App: React.FC = () => {
                   plans={plans}
                   allocations={allocations}
                   onSubmitPlan={handleSubmitPlan}
-                  onUpdateUser={handleUpdateUser}
                   tripLabels={{ departure: settings.departureLabel, arrival: settings.arrivalLabel }}
                   tripPrice={settings.tripPrice}
                   holidays={holidays}
-                  isProfileModalOpen={isProfileModalOpen}
-                  onCloseProfileModal={() => setIsProfileModalOpen(false)}
                 />;
       case Role.AllocationAdmin:
         return <AdminDashboard 
@@ -239,24 +262,36 @@ const App: React.FC = () => {
         return <p>Unknown user role.</p>;
     }
   };
-
-  if (isLoading && !currentUser) {
-    return <div className="flex items-center justify-center min-h-screen"><p>Loading application...</p></div>;
-  }
+  
+  const renderPreLoginContent = () => {
+    switch(view) {
+      case 'about':
+        return <AboutPage onBack={() => setView('login')} />;
+      case 'login':
+      default:
+        return <LoginPage 
+                  users={users} 
+                  onLogin={handleLogin} 
+                  userListViewEnabled={settings?.userListViewEnabled ?? true} 
+                  onShowAbout={() => setView('about')}
+                />;
+    }
+  };
 
   return (
     <div className="bg-slate-100 min-h-screen font-sans">
+      <LoadingOverlay isLoading={isLoading} />
       {successMessage && <SuccessBanner message={successMessage} onClose={() => setSuccessMessage(null)} />}
         {currentUser && settings && (
           <Header
             currentUser={currentUser}
             onLogout={handleLogout}
-            onProfileClick={currentUser.role === Role.User ? () => setIsProfileModalOpen(true) : undefined}
+            onProfileClick={currentUser.role === Role.User ? () => setLoggedInView('profile') : undefined}
           />
         )}
       <main className="container mx-auto p-4 sm:p-6 lg:p-8">
         {!currentUser ? (
-          <LoginPage users={users} onLogin={handleLogin} userListViewEnabled={settings?.userListViewEnabled ?? true} />
+          renderPreLoginContent()
         ) : (
           renderDashboard()
         )}

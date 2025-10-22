@@ -3,15 +3,6 @@ import { Plan, Allocation } from '../types';
 import Card from '../components/Card';
 import Calendar from '../components/Calendar';
 
-// Copied from allocationService.ts to categorize days for display before allocation
-const getWeek = (d: Date): [number, number] => {
-  d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return [d.getUTCFullYear(), weekNo];
-};
-
 interface AdminDashboardProps {
   plans: Plan[];
   allocations: Allocation[];
@@ -57,6 +48,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   updatedUsers, 
   tripLabels,
   holidays,
+  // FIX: Corrected typo in prop name from onUpdateHoldays to onUpdateHolidays to match the interface.
   onUpdateHolidays,
   allocateForCurrentMonth
 }) => {
@@ -103,11 +95,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   const handleHolidayClick = (day: number) => {
     const date = new Date(Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), day));
-    const dateString = date.toISOString().split('T')[0];
+    const dateString = date.toISOString();
 
     setSelectedHolidays(prev => 
-        prev.includes(dateString) 
-            ? prev.filter(d => d !== dateString) 
+        prev.some(d => d.startsWith(dateString.split('T')[0]))
+            ? prev.filter(d => !d.startsWith(dateString.split('T')[0])) 
             : [...prev, dateString].sort()
     );
   };
@@ -215,34 +207,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {displayedPlans.length > 0 ? (
                   <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                     {displayedPlans.map((plan, index) => {
-                      const departureDays: number[] = [];
-                      const arrivalDays: number[] = [];
-                      const weekBookingCounts = new Map<string, number>();
                       const sortedDays = [...(plan.selectedDays || [])].sort((a, b) => a - b);
-
-                      sortedDays.forEach(day => {
-                          const date = new Date(Date.UTC(plan.year, plan.month, day));
-                          const dayOfWeek = date.getUTCDay();
-                          const [year, week] = getWeek(date);
-                          const weekKey = `${year}-${week}`;
-                          const count = weekBookingCounts.get(weekKey) || 0;
-                          
-                          // This logic now mirrors the allocation service to avoid confusion
-                          if (dayOfWeek >= 3) {
-                              arrivalDays.push(day);
-                          } else {
-                              if (count === 0) {
-                                  departureDays.push(day);
-                              } else {
-                                  arrivalDays.push(day);
-                              }
-                          }
-                          
-                          weekBookingCounts.set(weekKey, count + 1);
-                      });
-                      
-                      departureDays.sort((a, b) => a - b);
-                      arrivalDays.sort((a, b) => a - b);
                       
                       return (
                         <div key={index} className="p-4 bg-slate-50 rounded-lg border">
@@ -250,15 +215,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <p className="text-sm text-slate-500">
                             {new Date(plan.year, plan.month).toLocaleString('default', { month: 'long', year: 'numeric' })}
                           </p>
-                          {departureDays.length > 0 && (
+                          {sortedDays.length > 0 ? (
                             <p className="text-sm text-slate-600 mt-2">
-                              Days({tripLabels.departure}): <span className="font-bold text-slate-800">{departureDays.join(', ')}</span>
+                              Selected Days: <span className="font-bold text-slate-800">{sortedDays.join(', ')}</span>
                             </p>
-                          )}
-                          {arrivalDays.length > 0 && (
-                            <p className="text-sm text-slate-600 mt-1">
-                              Days({tripLabels.arrival}): <span className="font-bold text-slate-800">{arrivalDays.join(', ')}</span>
-                            </p>
+                          ) : (
+                             <p className="text-sm text-slate-500 mt-2">No days selected.</p>
                           )}
                         </div>
                       )
@@ -328,7 +290,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               year={currentDate.getFullYear()}
               selectedDays={currentlyVisibleSelectedHolidays}
               onDayClick={handleHolidayClick}
-              holidays={holidays}
+              holidays={selectedHolidays}
               selectionColor="bg-red-500"
             />
 

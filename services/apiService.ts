@@ -1,8 +1,7 @@
 import { User, Plan, Allocation, SystemSettings } from '../types';
 
-// The base URL for your running .NET Web API
-// const BASE_URL = 'https://localhost:7116/api';
-const BASE_URL = 'https://c2c-tta-api-h3avdjb6ceendzec.southindia-01.azurewebsites.net/api';
+// UPDATED: Set to the correct local development API URL
+const BASE_URL = 'https://localhost:7116/api';
 
 // --- Helper for API calls ---
 async function fetchApi(endpoint: string, options: RequestInit = {}) {
@@ -37,7 +36,6 @@ async function fetchApi(endpoint: string, options: RequestInit = {}) {
 // --- API Service Functions ---
 
 // DTOs for requests that require an actor's ID for auditing
-// FIX: Updated DTO to allow role updates and pin changes.
 interface UserUpdateRequestDto extends Partial<Omit<User, 'id' | 'pin'>> {
   actorUserId: number;
   newPin?: string;
@@ -59,7 +57,7 @@ interface GenerateAllocationsDto {
 
 // Auth
 export const apiLogin = (identifier: string, pin: string): Promise<User> => {
-  return fetchApi('/login', { // Assuming your controller is named TripPlannerApiController
+  return fetchApi('/login', {
     method: 'POST',
     body: JSON.stringify({ identifier, pin }),
   });
@@ -87,4 +85,14 @@ export const updateSystemSettings = (settings: SystemSettingsUpdateDto): Promise
 
 // Holidays
 export const fetchHolidays = (): Promise<string[]> => fetchApi('/holidays');
-export const updateHolidays = (dto: UpdateHolidaysRequestDto): Promise<void> => fetchApi('/holidays', { method: 'PUT', body: JSON.stringify(dto) });
+export const updateHolidays = (dto: UpdateHolidaysRequestDto): Promise<void> => {
+  // Based on the 400 Bad Request error ("The JSON value could not be converted..."),
+  // the backend expects a JSON object that maps to its DTO, not a raw array.
+  // The API expects:
+  // 1. The actor's user ID as a query parameter (`?actorUserId=...`).
+  // 2. A JSON object like `{ "holidayDates": ["2024-01-01", ...] }` in the request body.
+  return fetchApi(`/holidays?actorUserId=${dto.actorUserId}`, { 
+    method: 'PUT', 
+    body: JSON.stringify({ holidayDates: dto.holidayDates }) 
+  });
+}

@@ -2,11 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { User, Role } from '../types';
 import Card from '../components/Card';
 import PinInput from '../components/PinInput';
+import LoadingOverlay from '../components/LoadingOverlay';
 
 interface LoginPageProps {
   users: User[];
   onLogin: (identifier: string, pin: string) => Promise<User>;
   userListViewEnabled: boolean;
+  onShowAbout: () => void;
 }
 
 const UserIcon = () => (
@@ -24,7 +26,7 @@ const AllocationAdminIcon = () => (
 
 const SystemAdminIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-      <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.532 1.532 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.532 1.532 0 01-.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+      <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.532 1.532 0 012.287-.947c1.372.836 2.942-.734-2.106-2.106a1.532 1.532 0 01-.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
     </svg>
 );
 
@@ -41,7 +43,7 @@ const CloseIcon = () => (
 );
 
 
-const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabled }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabled, onShowAbout }) => {
   // State for List View
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -55,10 +57,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabl
   const [loginPin, setLoginPin] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  // Common State
-  const [isHelpVisible, setIsHelpVisible] = useState(false);
-  const [isDevDetailsVisible, setIsDevDetailsVisible] = useState(false);
 
   const handleLoginClick = (user: User) => {
     setPinError('');
@@ -240,115 +238,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabl
     }
   };
 
-  const renderHelpContent = () => (
-    <Card className="w-full max-w-4xl max-h-[80vh] overflow-y-auto relative">
-      <div className="absolute top-4 right-4">
-        <button onClick={() => setIsHelpVisible(false)} className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg hover:bg-slate-300 font-semibold">
-            Back to Login
-        </button>
-      </div>
-      <h2 className="text-3xl font-bold text-slate-800 mb-6">C2C Trip Planner: A Comprehensive Guide</h2>
-      <div className="space-y-6 text-slate-700 text-base leading-relaxed pr-4">
-        
-        <section>
-          <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-indigo-200 pb-2 mb-3">General & Login</h3>
-          <ul className="list-disc list-inside space-y-2">
-            <li><strong>Dual Login Modes:</strong> The login screen can appear in two ways, controlled by the System Admin for security.
-              <ul className="list-['-_'] list-inside ml-6 mt-1">
-                  <li><strong>List View:</strong> A visual grid of user profiles. Convenient but less private.</li>
-                  <li><strong>Form View:</strong> A standard login form asking for your Name/Email and PIN. More secure.</li>
-              </ul>
-            </li>
-            <li><strong>PIN Security:</strong> All accounts are protected by a 4-digit PIN. After selecting your profile or entering your name, you must enter your PIN to log in.</li>
-          </ul>
-        </section>
-
-        <section>
-            <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-indigo-200 pb-2 mb-3">User Dashboard</h3>
-            <div className="space-y-4">
-                <div>
-                    <h4 className="text-lg font-bold text-indigo-700">Trip Planning (Calendar)</h4>
-                    <p>Navigate through months, click on dates to select/deselect your available travel days. Holidays are marked in red. Submit your plan for the month, and feel free to update it later as needed.</p>
-                </div>
-                <div>
-                    <h4 className="text-lg font-bold text-indigo-700">My Travel Schedule</h4>
-                    <p>This card is your finalized trip summary. It shows who is the designated <strong>Booker</strong> (responsible for making bookings) for each trip, who you're <strong>Traveling With</strong>, and the <strong>Trip Type</strong> (e.g., Departure/Arrival).</p>
-                </div>
-                <div>
-                    <h4 className="text-lg font-bold text-indigo-700">My Monthly Expense</h4>
-                    <p>Get a quick estimate of your personal trip-related costs for the month, calculated as: (Number of your bookings) x (Trip Price set by Admin).</p>
-                </div>
-                <div>
-                    <h4 className="text-lg font-bold text-indigo-700">Profile Management</h4>
-                    <p>Click your name in the header to edit your profile. You can update your name and email. You can also change your 4-digit PIN here for security by verifying your current PIN first.</p>
-                </div>
-            </div>
-        </section>
-
-        <section>
-          <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-indigo-200 pb-2 mb-3">Allocation Admin Dashboard</h3>
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-lg font-bold text-indigo-700">Interface & Navigation</h4>
-              <p>The dashboard features a minimizable sidebar (it starts minimized). When collapsed, hover over icons to see tooltips for 'Allocations' or 'Calendar'.</p>
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-indigo-700">Allocations View</h4>
-              <p>This is your main control panel. Review <strong>Submitted Plans</strong> for the relevant month (current or upcoming, based on a system setting). Click <strong>Allocate Bookings</strong> to run the automated, fair assignment process. The finalized <strong>Master Schedule</strong> shows all details. If a user updates their plan after allocation, a prominent <strong>warning</strong> will appear, prompting you to re-allocate.</p>
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-indigo-700">Calendar View</h4>
-              <p>Manage global holidays here. Select dates on the calendar and click 'Update Calendar' to mark them as non-working days for everyone, preventing them from being selected in plans.</p>
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h3 className="text-2xl font-bold text-slate-800 border-b-2 border-indigo-200 pb-2 mb-3">System Admin Dashboard</h3>
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-lg font-bold text-indigo-700">User Management</h4>
-              <p>The central hub for all user accounts. You can <strong>Add</strong>, <strong>Edit</strong>, or <strong>Delete</strong> users. For each user, you can set their Name, Email, Role (User, Admin, etc.), and their 'Send Email' preference.</p>
-            </div>
-            <div>
-              <h4 className="text-lg font-bold text-indigo-700">System Settings</h4>
-              <p>Customize the app's core behavior:
-                <ul className="list-disc list-inside ml-6 mt-1">
-                    <li><strong>Trip Labels:</strong> Change the text for 'Departure' and 'Arrival'.</li>
-                    <li><strong>Trip Price:</strong> Set the cost per trip used for expense calculations.</li>
-                    <li><strong>Allocate For Current Month:</strong> A crucial toggle that controls the planning cycle. When ON, the admin manages the current month. When OFF, they manage the upcoming month.</li>
-                    <li><strong>User List View:</strong> Toggles the main login screen between the visual user grid and the secure name/PIN form.</li>
-                </ul>
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
-    </Card>
-  );
-
-
   return (
     <>
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <LoadingOverlay isLoading={isLoggingIn} />
+      <div className="flex flex-col items-center justify-left min-h-screen p-4">
+                <main className="w-full flex-grow flex flex-col items-left justify-Center">
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">C2C TTA</h1>
+        </main>
         <main className="w-full flex-grow flex flex-col items-center justify-center">
-            {isHelpVisible ? (
-                renderHelpContent()
-            ) : (
-                <>
-                    <h2 className="text-3xl font-bold text-slate-800 mb-2">Welcome!</h2>
-                    {renderLoginContent()}
-                </>
-            )}
+            <h2 className="text-3xl font-bold text-slate-800 mb-2">Welcome!</h2>
+            {renderLoginContent()}
         </main>
         
         <footer className="w-full text-center text-slate-500 text-sm p-4 mt-8">
-            <span className="mx-2">© 2025</span> |
-            <button onClick={() => setIsDevDetailsVisible(true)} className="mx-2 text-indigo-600 hover:underline font-semibold">
-              Development Details
-            </button> |
-            <button onClick={() => setIsHelpVisible(true)} className="mx-2 text-indigo-600 hover:underline font-semibold">
-              Help
+            <span className="mx-2">© 2025 C2C-TTA. All rights reserved.</span> |
+            <span className="mx-2">Version 1.0.0</span> | 
+            <button onClick={onShowAbout} className="mx-2 text-indigo-600 hover:underline font-semibold">
+              About
             </button>
         </footer>
       </div>
@@ -368,44 +274,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabl
                 </button>
               </div>
             </form>
-          </Card>
-        </div>
-      )}
-
-      {isDevDetailsVisible && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setIsDevDetailsVisible(false)}>
-          <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-slate-800 mb-4">Development & Technology Stack</h3>
-            <div className="space-y-4 text-slate-700">
-              <div>
-                <h4 className="font-bold text-indigo-600">Lead Developer</h4>
-                <p>Sarath</p>
-              </div>
-              <div>
-                <h4 className="font-bold text-indigo-600">AI Collaboration</h4>
-                <p>Google Gemini API was utilized for AI-assisted code generation, refactoring, and feature implementation.</p>
-              </div>
-              <div>
-                <h4 className="font-bold text-indigo-600">Core Technology Stack</h4>
-                <ul className="list-disc list-inside">
-                  <li><strong>Frontend Framework:</strong> React</li>
-                  <li><strong>Language:</strong> TypeScript</li>
-                  <li><strong>Styling:</strong> Tailwind CSS</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-bold text-indigo-600">Technical Details</h4>
-                <ul className="list-disc list-inside">
-                  <li><strong>State Management:</strong> Client-side state managed with React Hooks (`useState`, `useEffect`, `useMemo`).</li>
-                  <li><strong>Data Persistence:</strong> Browser `localStorage` is used to maintain state across sessions.</li>
-                  <li><strong>Architecture:</strong> A component-based architecture with separation of concerns (UI components, services, hooks).</li>
-                  <li><strong>Environment:</strong> The application is built using modern web standards (ES Modules) and runs directly in the browser.</li>
-                </ul>
-              </div>
-            </div>
-            <div className="flex justify-end pt-6">
-              <button onClick={() => setIsDevDetailsVisible(false)} className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg hover:bg-slate-300 font-semibold">Close</button>
-            </div>
           </Card>
         </div>
       )}

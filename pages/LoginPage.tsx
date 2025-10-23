@@ -243,7 +243,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ users, onLogin, userListViewEnabl
       <LoadingOverlay isLoading={isLoggingIn} />
       <div className="flex flex-col items-center justify-left min-h-screen p-4">
                 <main className="w-full flex-grow flex flex-col items-left justify-Center">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">C2C TTA</h1>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">C2C Trip Planner</h1>
         </main>
         <main className="w-full flex-grow flex flex-col items-center justify-center">
             <h2 className="text-3xl font-bold text-slate-800 mb-2">Welcome!</h2>

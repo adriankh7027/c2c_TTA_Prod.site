@@ -1,7 +1,7 @@
 import { User, Plan, Allocation, SystemSettings } from '../types';
 
 // UPDATED: Set to the correct local development API URL
-const BASE_URL = 'https://c2c-tta-api-h3avdjb6ceendzec.southindia-01.azurewebsites.net/api';
+const BASE_URL = 'https://localhost:7116/api';
 
 // --- Helper for API calls ---
 async function fetchApi(endpoint: string, options: RequestInit = {}) {
@@ -53,6 +53,8 @@ interface UpdateHolidaysRequestDto {
 }
 interface GenerateAllocationsDto {
     actorUserId: number;
+    year: number;
+    month: number;
 }
 
 // Auth
@@ -77,7 +79,7 @@ export const fetchUpdatedUsers = (): Promise<string[]> => fetchApi('/plan-update
 
 // Allocations
 export const generateAllocations = (dto: GenerateAllocationsDto): Promise<Allocation[]> => fetchApi('/allocations/generate', { method: 'POST', body: JSON.stringify(dto) });
-export const fetchAllocations = (): Promise<Allocation[]> => fetchApi('/allocations');
+export const fetchAllocations = (year: number, month: number): Promise<Allocation[]> => fetchApi(`/allocations?year=${year}&month=${month}`);
 
 // Settings
 export const fetchSystemSettings = (): Promise<SystemSettings> => fetchApi('/settings');

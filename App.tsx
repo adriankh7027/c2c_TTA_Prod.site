@@ -23,6 +23,8 @@ const App: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [view, setView] = useState<'login' | 'about'>('login');
   const [loggedInView, setLoggedInView] = useState<'dashboard' | 'profile'>('dashboard');
+  const [userDashboardDate, setUserDashboardDate] = useState<Date>(new Date());
+  const [adminSelectedDate, setAdminSelectedDate] = useState<Date>(new Date());
 
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
@@ -46,16 +48,25 @@ const App: React.FC = () => {
   }, []);
   
   const loadDashboardData = useCallback(async () => {
-    if (!settings) return;
+    if (!settings || !currentUser) return;
+
+    let yearToFetch: number;
+    let monthToFetch: number;
+
+    if (currentUser.role === Role.User) {
+        yearToFetch = userDashboardDate.getFullYear();
+        monthToFetch = userDashboardDate.getMonth() + 1; // API expects 1-based month
+    } else {
+        // Admin roles fetch based on the admin's selected date in the UI.
+        yearToFetch = adminSelectedDate.getFullYear();
+        monthToFetch = adminSelectedDate.getMonth() + 1;
+    }
+    
     setIsLoading(true);
     try {
-        const today = new Date();
-        const targetMonth = settings.allocateForCurrentMonth ? today.getMonth() : (today.getMonth() + 1) % 12;
-        const targetYear = !settings.allocateForCurrentMonth && today.getMonth() === 11 ? today.getFullYear() + 1 : today.getFullYear();
-
         const [fetchedPlans, fetchedAllocations, fetchedHolidays, fetchedUpdatedUsers] = await Promise.all([
-            api.fetchPlans(targetYear, targetMonth),
-            api.fetchAllocations(),
+            api.fetchPlans(yearToFetch, monthToFetch),
+            api.fetchAllocations(yearToFetch, monthToFetch),
             api.fetchHolidays(),
             api.fetchUpdatedUsers()
         ]);
@@ -68,20 +79,29 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [settings]);
+  }, [settings, currentUser, userDashboardDate, adminSelectedDate]);
 
 
   useEffect(() => {
-    // Per user request, refreshing the browser should always return to the main login screen.
-    // Therefore, the session is not restored from sessionStorage on initial load.
     loadInitialData();
   }, [loadInitialData]);
+
+  useEffect(() => {
+    if (!settings) return;
+    const today = new Date();
+    
+    const targetMonth = settings.allocateForCurrentMonth ? today.getMonth() : today.getMonth() + 1;
+    const initialDate = new Date(today.getFullYear(), targetMonth, 1);
+    
+    setUserDashboardDate(initialDate);
+    setAdminSelectedDate(initialDate);
+}, [settings]);
   
   useEffect(() => {
     if (currentUser && settings) {
         loadDashboardData();
     }
-  }, [currentUser, settings, loadDashboardData]);
+  }, [currentUser, settings, userDashboardDate, adminSelectedDate, loadDashboardData]);
   
   const handleLogin = async (identifier: string, pin: string): Promise<User> => {
     try {
@@ -164,20 +184,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAllocate = async () => {
+  const handleAllocate = async (year: number, month: number) => {
     if (!currentUser || !settings) {
       alert('Cannot generate allocations. Missing required data.');
       return;
     }
     setIsLoading(true);
     try {
-      // Logic is now correctly using the backend API to generate and persist allocations.
-      const newAllocations = await api.generateAllocations({ actorUserId: currentUser.id });
-      
+      // FIX: Use the allocation list returned directly from the API to prevent race conditions.
+      const newAllocations = await api.generateAllocations({ actorUserId: currentUser.id, year, month });
       setAllocations(newAllocations);
 
-      // After generation, the list of users who updated their plan is cleared by the backend.
-      // Fetching it again confirms this and removes the warning banner.
       const fetchedUpdatedUsers = await api.fetchUpdatedUsers();
       setUpdatedUsers(fetchedUpdatedUsers);
 
@@ -235,67 +252,89 @@ const App: React.FC = () => {
                   tripLabels={{ departure: settings.departureLabel, arrival: settings.arrivalLabel }}
                   tripPrice={settings.tripPrice}
                   holidays={holidays}
+                  currentDate={userDashboardDate}
+                  onMonthChange={setUserDashboardDate}
                 />;
       case Role.AllocationAdmin:
-        return <AdminDashboard 
-                  plans={plans}
-                  allocations={allocations}
-                  onAllocate={handleAllocate}
-                  isLoading={isLoading}
-                  updatedUsers={updatedUsers}
-                  tripLabels={{ departure: settings.departureLabel, arrival: settings.arrivalLabel }}
-                  holidays={holidays}
-                  onUpdateHolidays={handleUpdateHolidays}
-                  allocateForCurrentMonth={settings.allocateForCurrentMonth}
-                />;
+        return (
+          <AdminDashboard
+            plans={plans}
+            allocations={allocations}
+            onAllocate={handleAllocate}
+            isLoading={isLoading}
+            updatedUsers={updatedUsers}
+            tripLabels={{ departure: settings.departureLabel, arrival: settings.arrivalLabel }}
+            holidays={holidays}
+            onUpdateHolidays={handleUpdateHolidays}
+            selectedDate={adminSelectedDate}
+            onDateChange={setAdminSelectedDate}
+          />
+        );
       case Role.SystemAdmin:
-        return <SystemAdminDashboard
-                  currentUser={currentUser}
-                  users={users}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  settings={settings}
-                  onUpdateSettings={handleUpdateSettings}
-                />;
+        return (
+          <SystemAdminDashboard
+            currentUser={currentUser}
+            users={users}
+            onAddUser={handleAddUser}
+            onUpdateUser={handleUpdateUser}
+            onDeleteUser={handleDeleteUser}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+          />
+        );
       default:
-        return <p>Unknown user role.</p>;
-    }
-  };
-  
-  const renderPreLoginContent = () => {
-    switch(view) {
-      case 'about':
-        return <AboutPage onBack={() => setView('login')} />;
-      case 'login':
-      default:
-        return <LoginPage 
-                  users={users} 
-                  onLogin={handleLogin} 
-                  userListViewEnabled={settings?.userListViewEnabled ?? true} 
-                  onShowAbout={() => setView('about')}
-                />;
+        return null;
     }
   };
 
+  const renderContent = () => {
+    if (isLoading && !settings) {
+      return <LoadingOverlay isLoading={true} />;
+    }
+
+    if (view === 'about') {
+      return <AboutPage onBack={() => setView('login')} />;
+    }
+
+    if (!currentUser) {
+      return (
+        <LoginPage
+          users={users}
+          onLogin={handleLogin}
+          userListViewEnabled={settings?.userListViewEnabled ?? false}
+          onShowAbout={() => setView('about')}
+        />
+      );
+    }
+
+    return (
+      <>
+        <Header
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onProfileClick={
+            currentUser.role === Role.User
+              ? () => setLoggedInView('profile')
+              : undefined
+          }
+        />
+        <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+          {renderDashboard()}
+        </main>
+      </>
+    );
+  };
+
   return (
-    <div className="bg-slate-100 min-h-screen font-sans">
+    <div className="bg-slate-50 min-h-screen text-slate-900">
       <LoadingOverlay isLoading={isLoading} />
-      {successMessage && <SuccessBanner message={successMessage} onClose={() => setSuccessMessage(null)} />}
-        {currentUser && settings && (
-          <Header
-            currentUser={currentUser}
-            onLogout={handleLogout}
-            onProfileClick={currentUser.role === Role.User ? () => setLoggedInView('profile') : undefined}
-          />
-        )}
-      <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-        {!currentUser ? (
-          renderPreLoginContent()
-        ) : (
-          renderDashboard()
-        )}
-      </main>
+      {successMessage && (
+        <SuccessBanner
+          message={successMessage}
+          onClose={() => setSuccessMessage(null)}
+        />
+      )}
+      {renderContent()}
     </div>
   );
 };

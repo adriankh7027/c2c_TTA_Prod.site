@@ -25,7 +25,7 @@ const DevDetailsPage: React.FC<DevDetailsPageProps> = ({ onBack }) => {
             
             <section>
               <h3 className="text-xl font-bold text-indigo-700 border-b pb-2 mb-3">Project Leadership</h3>
-              <p><strong>Lead Developer:</strong> <b>Sarath</b></p>
+              <p><strong>Lead Developer:</strong> Sarath</p>
               <p><strong>AI Collaboration:</strong> Google Gemini API was integral for AI-assisted code generation, architectural refactoring, feature implementation, and UI/UX enhancements.</p>
             </section>
 

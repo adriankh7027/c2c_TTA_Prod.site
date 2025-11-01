@@ -7,7 +7,6 @@ interface AboutPageProps {
 
 const ProductDetailsContent: React.FC = () => (
     <>
-        <br></br>
         <h2 className="text-3xl font-bold text-slate-800 mb-6">C2C Trip Planner: A Comprehensive Guide</h2>
         <div className="space-y-6 text-slate-700 text-base leading-relaxed pr-4">
         
@@ -157,12 +156,12 @@ const ContactUsContent: React.FC = () => (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-slate-50 p-6 rounded-lg border">
                         <h4 className="text-lg font-bold text-indigo-700 mb-2">General Inquiries</h4>
-                        <p><strong>Email:</strong> <a href="mailto:c2c.tta@gmail.com" className="text-indigo-600 hover:underline">c2c.tta@gmail.com</a></p>
+                        <p><strong>Email:</strong> <a href="mailto:info@c2ctripplanner.com" className="text-indigo-600 hover:underline">info@c2ctripplanner.com</a></p>
                         <p><strong>Phone:</strong> <a href="tel:+1-800-555-0199" className="text-indigo-600 hover:underline">+1 (800) 555-0199</a></p>
                     </div>
                     <div className="bg-slate-50 p-6 rounded-lg border">
                         <h4 className="text-lg font-bold text-indigo-700 mb-2">Technical Support</h4>
-                        <p><strong>Email:</strong> <a href="mailto:support.c2c.tta@gmail.com" className="text-indigo-600 hover:underline">support.c2c.tta@gmail.com</a></p>
+                        <p><strong>Email:</strong> <a href="mailto:support@c2ctripplanner.com" className="text-indigo-600 hover:underline">support@c2ctripplanner.com</a></p>
                         <p><strong>Status Page:</strong> <a href="#" className="text-indigo-600 hover:underline">status.c2ctripplanner.com</a></p>
                     </div>
                 </div>
@@ -209,8 +208,8 @@ const AboutPage: React.FC<AboutPageProps> = ({ onBack }) => {
             <aside className="w-1/4 pr-8 border-r border-slate-200">
                 <h2 className="text-2xl font-bold text-slate-800 mb-6 pl-4">About</h2>
                 <ul className="space-y-2">
-                    <NavItem label="Product" tabName="product" />
-                    <NavItem label="Development" tabName="dev" />
+                    <NavItem label="Product Details" tabName="product" />
+                    <NavItem label="Development Details" tabName="dev" />
                     <NavItem label="Contact Us" tabName="contact" />
                 </ul>
             </aside>

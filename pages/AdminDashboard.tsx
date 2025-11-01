@@ -6,13 +6,14 @@ import Calendar from '../components/Calendar';
 interface AdminDashboardProps {
   plans: Plan[];
   allocations: Allocation[];
-  onAllocate: () => void;
+  onAllocate: (year: number, month: number) => void;
   isLoading: boolean;
   updatedUsers: string[];
   tripLabels: { departure: string; arrival: string };
   holidays: string[];
   onUpdateHolidays: (holidays: string[]) => void;
-  allocateForCurrentMonth: boolean;
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
 const MinimizeIcon = () => (
@@ -48,9 +49,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   updatedUsers, 
   tripLabels,
   holidays,
-  // FIX: Corrected typo in prop name from onUpdateHoldays to onUpdateHolidays to match the interface.
   onUpdateHolidays,
-  allocateForCurrentMonth
+  selectedDate,
+  onDateChange
 }) => {
   const [activeView, setActiveView] = useState<'allocations' | 'calendar'>('allocations');
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(true);
@@ -63,33 +64,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setSelectedHolidays(holidays);
   }, [holidays]);
 
-  const displayedPlans = useMemo(() => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-
-    let targetMonth, targetYear;
-    if (allocateForCurrentMonth) {
-      targetMonth = currentMonth;
-      targetYear = currentYear;
-    } else {
-      targetMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-      targetYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-    }
-    
-    return plans.filter(p => p.month === targetMonth && p.year === targetYear);
-  }, [plans, allocateForCurrentMonth]);
-
   const plansMonthTitle = useMemo(() => {
-    const targetDate = new Date();
-    if (!allocateForCurrentMonth) {
-        targetDate.setMonth(targetDate.getMonth() + 1);
-    }
-    return targetDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-  }, [allocateForCurrentMonth]);
+    return selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }, [selectedDate]);
+
+  const displayedAllocations = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth(); // 0-indexed local
+    return allocations.filter(alloc => {
+      // "YYYY-MM-DD" is parsed as UTC midnight. To compare with local, we need to adjust.
+      const [y, m, d] = alloc.date.split('-').map(Number);
+      const allocDate = new Date(y, m - 1, d); // Creates date in local timezone.
+      return allocDate.getFullYear() === year && allocDate.getMonth() === month;
+    });
+  }, [allocations, selectedDate]);
+
+  const handleYearChange = (offset: number) => {
+    const newDate = new Date(selectedDate.getFullYear() + offset, selectedDate.getMonth(), 1);
+    onDateChange(newDate);
+  };
+
+  const handleMonthChange = (monthIndex: number) => {
+    const newDate = new Date(selectedDate.getFullYear(), monthIndex, 1);
+    onDateChange(newDate);
+  };
 
 
-  const handleMonthChange = (offset: number) => {
+  const handleCalendarMonthChange = (offset: number) => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
   };
   
@@ -167,17 +168,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeView === 'allocations' && (
           <div className="space-y-8">
             <Card>
-              <div className="flex justify-between items-center">
-                 <h2 className="text-2xl font-bold text-slate-800">Allocation Dashboard</h2>
-                <button
-                  onClick={onAllocate}
-                  disabled={isLoading || displayedPlans.length === 0}
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-slate-400 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? 'Allocating...' : 'Allocate Bookings'}
-                </button>
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Allocation Dashboard</h2>
+                  <p className="text-slate-600 mt-2">Review submitted travel plans and generate the booking allocation for all members.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-3 w-full lg:w-auto shrink-0">
+                  <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-slate-300 shadow-sm">
+                    <button onClick={() => handleYearChange(-1)} className="px-2 py-1 rounded-md hover:bg-slate-100 font-bold text-slate-600" title="Previous Year">
+                      &lt;&lt;
+                    </button>
+                    <span className="font-semibold text-slate-700 w-20 text-center">{selectedDate.getFullYear()}</span>
+                    <button onClick={() => handleYearChange(1)} className="px-2 py-1 rounded-md hover:bg-slate-100 font-bold text-slate-600" title="Next Year">
+                      &gt;&gt;
+                    </button>
+                  </div>
+                  <select
+                    value={selectedDate.getMonth()}
+                    onChange={(e) => handleMonthChange(Number(e.target.value))}
+                    className="px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i} value={i}>
+                        {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => onAllocate(selectedDate.getFullYear(), selectedDate.getMonth() + 1)}
+                    disabled={isLoading || plans.length === 0}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-semibold disabled:bg-slate-400 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Allocating...' : 'Allocate Bookings'}
+                  </button>
+                </div>
               </div>
-              <p className="text-slate-600 mt-4">Review submitted travel plans and generate the booking allocation for all members.</p>
             </Card>
 
             {updatedUsers.length > 0 && (
@@ -204,16 +229,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <Card>
                 <h3 className="text-xl font-bold text-slate-800 mb-1">Submitted Plans</h3>
                 <p className="text-sm font-semibold text-indigo-600 mb-4">Showing plans for: {plansMonthTitle}</p>
-                {displayedPlans.length > 0 ? (
+                {plans.length > 0 ? (
                   <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                    {displayedPlans.map((plan, index) => {
+                    {plans.map((plan, index) => {
                       const sortedDays = [...(plan.selectedDays || [])].sort((a, b) => a - b);
                       
                       return (
                         <div key={index} className="p-4 bg-slate-50 rounded-lg border">
                           <p className="font-semibold text-slate-700">{plan.userName}</p>
                           <p className="text-sm text-slate-500">
-                            {new Date(plan.year, plan.month).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            {new Date(plan.year, plan.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
                           </p>
                           {sortedDays.length > 0 ? (
                             <p className="text-sm text-slate-600 mt-2">
@@ -233,25 +258,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <Card>
                 <h3 className="text-xl font-bold text-slate-800 mb-4">Master Allocation Schedule</h3>
-                {allocations.length > 0 ? (
-                  <div className="max-h-96 overflow-y-auto pr-2">
-                    <table className="w-full text-left">
+                {displayedAllocations.length > 0 ? (
+                  <div className="max-h-96 overflow-y-auto overflow-x-auto">
+                    <table className="w-full text-left whitespace-nowrap">
                       <thead className="sticky top-0 bg-white">
                         <tr>
-                          <th className="p-2 border-b-2 text-slate-600">Date</th>
+                          <th className="p-2 border-b-2 text-slate-600 sticky left-0 bg-white">Date</th>
                           <th className="p-2 border-b-2 text-slate-600 text-center">Type</th>
                           <th className="p-2 border-b-2 text-slate-600">Booker</th>
                           <th className="p-2 border-b-2 text-slate-600">Travelers</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {allocations.map((alloc, index) => (
+                        {displayedAllocations.map((alloc, index) => (
                           <tr key={index} className="border-b">
-                            <td className="p-2 text-slate-700">{alloc.date}</td>
+                            <td className="p-2 text-slate-700 sticky left-0 bg-white">{alloc.date}</td>
                             <td className="p-2 text-center">
                               {alloc.tripType && (
-                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                  alloc.tripType === tripLabels.departure ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                <span className={`px-2 py-0.5 text-sm font-small rounded-full text-white ${
+                                  alloc.tripType === tripLabels.departure ? 'bg-blue-500' : 'bg-violet-400'
                                 }`}>
                                   {alloc.tripType}
                                 </span>
@@ -265,7 +290,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </table>
                   </div>
                 ) : (
-                  <p className="text-slate-500 text-center py-8">No allocations generated. Click "Allocate Bookings" to start.</p>
+                  <p className="text-slate-500 text-center py-8">No allocations generated for {plansMonthTitle}.</p>
                 )}
               </Card>
             </div>
@@ -278,11 +303,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <p className="text-slate-600 mb-6">Select dates on the calendar to mark them as holidays. These days will be highlighted for all users during trip planning.</p>
             
             <div className="flex items-center justify-between mb-6">
-              <button onClick={() => handleMonthChange(-1)} className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300">&lt; Prev</button>
+              <button onClick={() => handleCalendarMonthChange(-1)} className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300">&lt; Prev</button>
               <h3 className="text-xl font-semibold text-slate-700">
                 {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
               </h3>
-              <button onClick={() => handleMonthChange(1)} className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300">Next &gt;</button>
+              <button onClick={() => handleCalendarMonthChange(1)} className="px-4 py-2 bg-slate-200 rounded-lg hover:bg-slate-300">Next &gt;</button>
             </div>
 
             <Calendar

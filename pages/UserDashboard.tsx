@@ -11,6 +11,8 @@ interface UserDashboardProps {
   tripLabels: { departure: string; arrival: string };
   tripPrice: number;
   holidays: string[];
+  currentDate: Date;
+  onMonthChange: (date: Date) => void;
 }
 
 const UserDashboard: React.FC<UserDashboardProps> = ({
@@ -21,21 +23,26 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   tripLabels,
   tripPrice,
   holidays,
+  currentDate,
+  onMonthChange,
 }) => {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [currentDate, setCurrentDate] = useState(() => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
-  });
+  
+  // Memoize the 1-based month to ensure consistency
+  const currentMonthOneBased = useMemo(() => currentDate.getMonth() + 1, [currentDate]);
+  const currentYear = useMemo(() => currentDate.getFullYear(), [currentDate]);
 
   useEffect(() => {
+    // FIX: Correctly find the plan for the current month by comparing 1-based month values.
+    // This ensures that when the UI displays a month (e.g., December), it correctly looks for a plan
+    // with the corresponding 1-based month value (12) from the API data.
     const planForMonth = plans.find(p =>
       p.userId === user.id &&
-      p.year === currentDate.getFullYear() &&
-      p.month === currentDate.getMonth()
+      p.year === currentYear &&
+      p.month === currentMonthOneBased
     );
     setSelectedDays(planForMonth?.selectedDays || []);
-  }, [plans, user.id, currentDate]);
+  }, [plans, user.id, currentYear, currentMonthOneBased]);
 
   const handleDayClick = (day: number) => {
     setSelectedDays(prev =>
@@ -44,26 +51,42 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   };
 
   const handleSubmit = () => {
+    // FIX: Ensure the submitted plan uses a 1-based month, as the backend API expects it.
+    // JavaScript's getMonth() is 0-indexed (0-11), so we add 1 to align with the database schema (1-12).
     const plan: Omit<Plan, 'userName'> = {
       userId: user.id,
-      month: currentDate.getMonth(),
-      year: currentDate.getFullYear(),
+      month: currentMonthOneBased,
+      year: currentYear,
       selectedDays: selectedDays,
     };
     onSubmitPlan(plan);
   };
 
   const handleMonthChange = (offset: number) => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
+    const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
+    onMonthChange(newDate);
   };
   
   const monthTitle = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   const userAllocations = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth(); // This is 0-indexed (0-11)
+
     return allocations
-      .filter(alloc => alloc.travelers.some(t => t.id === user.id))
+      .filter(alloc => {
+        const [allocYear, allocMonth] = alloc.date.split('-').map(Number);
+        
+        // allocMonth is 1-based (1-12), so we subtract 1 for comparison
+        const isCorrectMonth = allocYear === year && (allocMonth - 1) === month;
+        if (!isCorrectMonth) {
+          return false;
+        }
+
+        return alloc.travelers.some(t => t.id === user.id);
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [allocations, user.id]);
+  }, [allocations, user.id, currentDate]);
 
   const monthlyExpense = userAllocations.length * tripPrice;
 
@@ -103,21 +126,31 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
           <Card>
             <h3 className="text-xl font-bold text-slate-800 mb-4">My Travel Schedule</h3>
             {userAllocations.length > 0 ? (
-              <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
                 {userAllocations.map(alloc => (
-                  <div key={alloc.date} className="p-3 bg-slate-50 rounded-lg border">
-                    <div className="flex justify-between items-center">
-                      <p className="font-bold text-slate-700">{alloc.date}</p>
-                      {alloc.tripType && (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          alloc.tripType === tripLabels.departure ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                  <div key={alloc.date} className="p-4 bg-slate-50 rounded-lg border">
+                    <p className="font-bold text-slate-800 text-lg">{alloc.date}</p>
+                    {alloc.tripType && (
+                        <span className={`inline-block mt-1 px-2 py-0.5 text-sm font-semibold rounded-full text-white ${
+                            alloc.tripType === tripLabels.departure ? 'bg-blue-600' : 'bg-violet-500'
                         }`}>
-                          {alloc.tripType}
+                            {alloc.tripType}
                         </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 mt-1">Booker: <span className="font-semibold text-indigo-600">{alloc.bookerName}</span></p>
-                    <p className="text-sm text-slate-500">Traveling with: {alloc.travelers.filter(t => t.id !== user.id).map(t => t.name).join(', ') || 'None'}</p>
+                    )}
+                    <p className="text-sm text-slate-600 mt-3">
+                        Booker: 
+                        {alloc.bookerId === user.id ? (
+                             <span className="ml-2 px-2 py-1 text-xs font-bold text-green-800 bg-green-200 rounded-full">
+                                You!
+                            </span>
+                        ) : (
+                            <span className="font-semibold text-indigo-600 ml-1">{alloc.bookerName}</span>
+                        )}
+                    </p>
+                    <p className="text-sm text-slate-500 mt-1">
+                        Traveling with: 
+                        <span className="ml-1">{alloc.travelers.filter(t => t.id !== user.id).map(t => t.name).join(', ') || 'None'}</span>
+                    </p>
                   </div>
                 ))}
               </div>
@@ -129,8 +162,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
           <Card>
             <h3 className="text-xl font-bold text-slate-800">My Monthly Expense</h3>
             <p className="text-3xl font-bold text-emerald-600 mt-2">₹{monthlyExpense.toFixed(2)}</p>
-            <p className="text-slate-500 text-sm mt-1">Based on {userAllocations.length} trips for {currentDate.toLocaleString('default', { month: 'long' })} at ₹{tripPrice} each.
-            </p>
+            <p className="text-slate-500 text-sm mt-1">{userAllocations.length} trips × ₹{tripPrice.toFixed(2)}/trip</p>
           </Card>
         </div>
       </div>

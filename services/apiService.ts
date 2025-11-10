@@ -1,7 +1,9 @@
 import { User, Plan, Allocation, SystemSettings } from '../types';
 
 // UPDATED: Set to the correct local development API URL
-const BASE_URL = 'https://c2c-tta-api-h3avdjb6ceendzec.southindia-01.azurewebsites.net/api';
+const BASE_URL = 'http://tta-api.runasp.net/api';
+//const BASE_URL = 'https://localhost:7116/api';
+
 
 // --- Helper for API calls ---
 async function fetchApi(endpoint: string, options: RequestInit = {}) {
